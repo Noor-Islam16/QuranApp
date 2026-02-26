@@ -1,36 +1,29 @@
-// src/components/SearchBar.tsx
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Searchbar, useTheme } from "react-native-paper";
 
 type SearchBarProps = {
+  value: string;
   onSearch: (query: string) => void;
   placeholder?: string;
 };
 
 const SearchBar: React.FC<SearchBarProps> = ({
+  value,
   onSearch,
   placeholder = "Search...",
 }) => {
-  const [searchQuery, setSearchQuery] = useState("");
   const theme = useTheme();
-
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      onSearch(searchQuery);
-    }
-  };
 
   return (
     <View style={styles.container}>
       <Searchbar
         placeholder={placeholder}
-        onChangeText={setSearchQuery}
-        value={searchQuery}
-        onSubmitEditing={handleSearch}
+        value={value}
+        onChangeText={onSearch} // 🔥 live search
         style={[styles.searchBar, { backgroundColor: theme.colors.surface }]}
         iconColor={theme.colors.primary}
-        placeholderTextColor={"#78909C"}
+        placeholderTextColor="#78909C"
         inputStyle={{ color: "#263238" }}
       />
     </View>

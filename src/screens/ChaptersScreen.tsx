@@ -44,7 +44,7 @@ const ChaptersScreen = () => {
         chapter.englishNameTranslation
           .toLowerCase()
           .includes(query.toLowerCase()) ||
-        chapter.number.toString() === query
+        chapter.number.toString() === query,
     );
     setFilteredChapters(filtered);
   };
@@ -57,8 +57,12 @@ const ChaptersScreen = () => {
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <Header title="Quran Chapters" />
-      <SearchBar onSearch={handleSearch} placeholder="Search chapters..." />
+      <Header title="Surah" />
+      <SearchBar
+        onSearch={handleSearch}
+        placeholder="Search surah..."
+        value={""}
+      />
 
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -84,6 +88,7 @@ const ChaptersScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: 60,
   },
   loaderContainer: {
     flex: 1,

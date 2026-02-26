@@ -29,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({
         styles.container,
         {
           backgroundColor: theme.colors.surface,
-          paddingTop: insets.top + 10,
+          paddingTop: insets.top + 0,
           borderBottomColor: theme.colors.background,
         },
       ]}
@@ -53,11 +53,11 @@ const Header: React.FC<HeaderProps> = ({
             style={styles.rightButton}
             onPress={onRightIconPress}
           >
-            <Ionicons
+            {/* <Ionicons
               name={rightIcon as any}
               size={24}
               color={theme.colors.primary}
-            />
+            /> */}
           </TouchableOpacity>
         )}
       </View>

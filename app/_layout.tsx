@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import AppNavigator from "@/src/navigation/AppNavigator";
 import { AppContextProvider } from "@/src/context/AppContext";
 import { theme } from "@/src/constants/theme";
+import RootNavigator from "@/src/navigation/RootNavigator";
 
 export default function App() {
   return (
@@ -13,7 +14,7 @@ export default function App() {
       <PaperProvider theme={theme}>
         <AppContextProvider>
           <StatusBar style="auto" />
-          <AppNavigator />
+          <RootNavigator />
         </AppContextProvider>
       </PaperProvider>
     </SafeAreaProvider>

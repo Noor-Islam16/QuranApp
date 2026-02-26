@@ -1,97 +1,66 @@
-// src/screens/ChapterDetailScreen.tsx
+// src/screens/JuzDetailScreen.tsx
 import React, { useEffect, useState, useRef } from "react";
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-} from "react-native";
+import { View, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { Text, Divider, FAB, useTheme } from "react-native-paper";
-import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { useRoute, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../components/Header";
 import VerseItem from "../components/VerseItem";
-import { fetchChapter, Chapter, Verse } from "../api/quranApi";
+import { fetchJuz, JuzInfo, Verse } from "../api/quranApi";
 
 const LAST_READ_KEY = "@last_read_item";
 
 type RouteParams = {
-  chapter: Chapter;
-  initialVerse?: number;
+  juz: JuzInfo;
 };
 
-const ChapterDetailScreen = () => {
+const JuzDetailScreen = () => {
   const theme = useTheme();
   const route = useRoute<RouteProp<Record<string, RouteParams>, string>>();
-  const navigation = useNavigation();
-  const { chapter, initialVerse } = route.params || {};
+  const { juz } = route.params || {};
   const [verses, setVerses] = useState<Verse[]>([]);
   const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    if (chapter) {
-      loadChapterDetails();
-      saveLastReadChapter();
+    if (juz) {
+      loadJuzVerses();
+      saveLastReadJuz();
     }
-  }, [chapter]);
+  }, [juz?.number]);
 
-  const loadChapterDetails = async () => {
+  const loadJuzVerses = async () => {
     try {
       setLoading(true);
-      const data = await fetchChapter(chapter.number);
+      const data = await fetchJuz(juz.number);
       setVerses(data.verses);
-
-      // Scroll to initial verse if provided
-      if (
-        initialVerse &&
-        initialVerse > 0 &&
-        initialVerse <= data.verses.length
-      ) {
-        setTimeout(() => {
-          scrollToVerse(initialVerse);
-        }, 500);
-      }
     } catch (error) {
-      console.error("Error loading chapter details:", error);
+      console.error("Error loading juz verses:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const saveLastReadChapter = async () => {
+  const saveLastReadJuz = async () => {
     try {
       const lastReadData = {
-        type: "chapter",
-        chapter: {
-          number: chapter.number,
-          name: chapter.name,
-          englishName: chapter.englishName,
-          englishNameTranslation: chapter.englishNameTranslation,
-          numberOfAyahs: chapter.numberOfAyahs,
-          revelationType: chapter.revelationType,
+        type: "juz",
+        juz: {
+          number: juz.number,
+          name: juz.name,
+          nameArabic: juz.nameArabic,
+          startSurah: juz.startSurah,
+          startVerse: juz.startVerse,
+          endSurah: juz.endSurah,
+          endVerse: juz.endVerse,
         },
         timestamp: new Date().toISOString(),
       };
       await AsyncStorage.setItem(LAST_READ_KEY, JSON.stringify(lastReadData));
-      console.log(
-        `✅ Saved last read Surah: ${chapter.number} - ${chapter.englishName}`,
-      );
+      console.log(`✅ Saved last read Juz: ${juz.number} - ${juz.name}`);
     } catch (error) {
-      console.error("Error saving last read chapter:", error);
-    }
-  };
-
-  const scrollToVerse = (verseNumber: number) => {
-    const index = verses.findIndex((v) => v.number === verseNumber);
-    if (index !== -1 && flatListRef.current) {
-      flatListRef.current.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0,
-      });
+      console.error("Error saving last read Juz:", error);
     }
   };
 
@@ -104,38 +73,32 @@ const ChapterDetailScreen = () => {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       <Header
-        title={chapter?.englishName || ""}
+        title={juz?.name || ""}
         showBackButton
         rightIcon="bookmark-outline"
       />
 
-      {/* Chapter Info */}
-      <View
-        style={[styles.chapterInfo, { backgroundColor: theme.colors.surface }]}
-      >
-        <View style={styles.chapterNameContainer}>
+      {/* Juz Info */}
+      <View style={[styles.juzInfo, { backgroundColor: theme.colors.surface }]}>
+        <View style={styles.juzNameContainer}>
           <Text style={[styles.arabicName, { color: "#263238" }]}>
-            {chapter?.name}
+            {juz?.nameArabic}
           </Text>
           <Text style={[styles.translation, { color: "#78909C" }]}>
-            {chapter?.englishNameTranslation}
+            {juz?.name}
           </Text>
         </View>
-        <View style={styles.chapterMetaContainer}>
+        <View style={styles.juzMetaContainer}>
           <View style={styles.metaItem}>
-            <Ionicons name="location" size={14} color={theme.colors.primary} />
+            <Ionicons name="book" size={14} color={theme.colors.primary} />
             <Text style={[styles.metaText, { color: "#263238" }]}>
-              {chapter?.revelationType}
+              Surah {juz?.startSurah}:{juz?.startVerse}
             </Text>
           </View>
           <View style={styles.metaItem}>
-            <Ionicons
-              name="document-text"
-              size={14}
-              color={theme.colors.primary}
-            />
+            <Ionicons name="book" size={14} color={theme.colors.primary} />
             <Text style={[styles.metaText, { color: "#263238" }]}>
-              {chapter?.numberOfAyahs} verses
+              Surah {juz?.endSurah}:{juz?.endVerse}
             </Text>
           </View>
         </View>
@@ -152,9 +115,11 @@ const ChapterDetailScreen = () => {
           <FlatList
             ref={flatListRef}
             data={verses}
-            keyExtractor={(item) => item.number.toString()}
+            keyExtractor={(item, index) =>
+              `${item.surahNumber}-${item.number}-${index}`
+            }
             renderItem={({ item }) => (
-              <VerseItem verse={item} chapterNumber={chapter.number} />
+              <VerseItem verse={item} chapterNumber={item.surahNumber} />
             )}
             contentContainerStyle={styles.listContent}
             onScroll={handleScroll}
@@ -180,12 +145,11 @@ const ChapterDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: 60,
   },
-  chapterInfo: {
+  juzInfo: {
     padding: 16,
   },
-  chapterNameContainer: {
+  juzNameContainer: {
     alignItems: "center",
     marginBottom: 12,
   },
@@ -197,7 +161,7 @@ const styles = StyleSheet.create({
   translation: {
     fontSize: 16,
   },
-  chapterMetaContainer: {
+  juzMetaContainer: {
     flexDirection: "row",
     justifyContent: "center",
     marginBottom: 8,
@@ -227,4 +191,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChapterDetailScreen;
+export default JuzDetailScreen;

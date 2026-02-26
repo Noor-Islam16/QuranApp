@@ -1,12 +1,23 @@
 // src/screens/SettingsScreen.tsx
 import React from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Linking,
+} from "react-native";
 import { Text, Switch, Divider, List, useTheme } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import Header from "../components/Header";
 import { useAppContext } from "../context/AppContext";
 
 const SettingsScreen = () => {
+  const handleRateApp = () => {
+    Linking.openURL(
+      "https://play.google.com/store/apps/details?id=com.asrtech123.QuranApp",
+    );
+  };
   const theme = useTheme();
   const {
     language,
@@ -18,29 +29,88 @@ const SettingsScreen = () => {
     toggleDarkMode,
   } = useAppContext();
 
+  // Language-specific text
+  const translations = {
+    en: {
+      settings: "Settings",
+      display: "Display",
+      darkMode: "Dark Mode",
+      fontSize: "Font Size",
+      language: "Language",
+      about: "About",
+      aboutApp: "About the App",
+      privacyPolicy: "Privacy Policy",
+      rateApp: "Rate the App",
+      version: "Version 1.0.1",
+    },
+    ar: {
+      settings: "الإعدادات",
+      display: "العرض",
+      darkMode: "الوضع الداكن",
+      fontSize: "حجم الخط",
+      language: "اللغة",
+      about: "حول",
+      aboutApp: "عن التطبيق",
+      privacyPolicy: "سياسة الخصوصية",
+      rateApp: "قيم التطبيق",
+      version: "الإصدار 1.0.0",
+    },
+  };
+
+  const t = translations[language];
+  const isRTL = language === "ar";
+
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <Header title="Settings" />
+      <Header title={t.settings} />
 
       <ScrollView>
         <List.Section>
-          <List.Subheader style={{ color: theme.colors.primary }}>
-            Display
+          <List.Subheader
+            style={{
+              color: theme.colors.primary,
+              textAlign: isRTL ? "right" : "left",
+              fontSize: fontSize,
+            }}
+          >
+            {t.display}
           </List.Subheader>
 
           {/* Dark Mode */}
-          <TouchableOpacity style={styles.settingItem} onPress={toggleDarkMode}>
-            <View style={styles.settingContent}>
+          {/* <TouchableOpacity
+            style={[
+              styles.settingItem,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+            onPress={toggleDarkMode}
+          >
+            <View
+              style={[
+                styles.settingContent,
+                { flexDirection: isRTL ? "row-reverse" : "row" },
+              ]}
+            >
               <Ionicons
                 name="moon-outline"
                 size={24}
                 color={theme.colors.primary}
-                style={styles.settingIcon}
+                style={[
+                  styles.settingIcon,
+                  isRTL ? { marginLeft: 16, marginRight: 0 } : {},
+                ]}
               />
-              <Text style={[styles.settingText, { color: "#263238" }]}>
-                Dark Mode
+              <Text
+                style={[
+                  styles.settingText,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
+                {t.darkMode}
               </Text>
             </View>
             <Switch
@@ -48,21 +118,42 @@ const SettingsScreen = () => {
               onValueChange={toggleDarkMode}
               color={theme.colors.primary}
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
-          <Divider />
+          {/* <Divider /> */}
 
           {/* Font Size */}
-          <View style={styles.settingItem}>
-            <View style={styles.settingContent}>
+          <View
+            style={[
+              styles.settingItem,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+          >
+            <View
+              style={[
+                styles.settingContent,
+                { flexDirection: isRTL ? "row-reverse" : "row" },
+              ]}
+            >
               <Ionicons
                 name="text-outline"
                 size={24}
                 color={theme.colors.primary}
-                style={styles.settingIcon}
+                style={[
+                  styles.settingIcon,
+                  isRTL ? { marginLeft: 16, marginRight: 0 } : {},
+                ]}
               />
-              <Text style={[styles.settingText, { color: "#263238" }]}>
-                Font Size
+              <Text
+                style={[
+                  styles.settingText,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
+                {t.fontSize}
               </Text>
             </View>
             <View style={styles.fontSizeControls}>
@@ -72,14 +163,27 @@ const SettingsScreen = () => {
                   { backgroundColor: theme.colors.surface },
                 ]}
                 onPress={decreaseFontSize}
+                disabled={fontSize <= 12}
               >
                 <Ionicons
                   name="remove"
                   size={20}
-                  color={theme.colors.primary}
+                  color={
+                    fontSize <= 12
+                      ? theme.colors.disabled
+                      : theme.colors.primary
+                  }
                 />
               </TouchableOpacity>
-              <Text style={[styles.fontSizeValue, { color: "#263238" }]}>
+              <Text
+                style={[
+                  styles.fontSizeValue,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
                 {fontSize}
               </Text>
               <TouchableOpacity
@@ -88,8 +192,17 @@ const SettingsScreen = () => {
                   { backgroundColor: theme.colors.surface },
                 ]}
                 onPress={increaseFontSize}
+                disabled={fontSize >= 24}
               >
-                <Ionicons name="add" size={20} color={theme.colors.primary} />
+                <Ionicons
+                  name="add"
+                  size={20}
+                  color={
+                    fontSize >= 24
+                      ? theme.colors.disabled
+                      : theme.colors.primary
+                  }
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -97,20 +210,48 @@ const SettingsScreen = () => {
           <Divider />
 
           {/* Language */}
-          <TouchableOpacity style={styles.settingItem} onPress={toggleLanguage}>
-            <View style={styles.settingContent}>
+          <TouchableOpacity
+            style={[
+              styles.settingItem,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+            onPress={toggleLanguage}
+          >
+            <View
+              style={[
+                styles.settingContent,
+                { flexDirection: isRTL ? "row-reverse" : "row" },
+              ]}
+            >
               <Ionicons
                 name="language-outline"
                 size={24}
                 color={theme.colors.primary}
-                style={styles.settingIcon}
+                style={[
+                  styles.settingIcon,
+                  isRTL ? { marginLeft: 16, marginRight: 0 } : {},
+                ]}
               />
-              <Text style={[styles.settingText, { color: "#263238" }]}>
-                Language
+              <Text
+                style={[
+                  styles.settingText,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
+                {t.language}
               </Text>
             </View>
             <Text
-              style={[styles.languageValue, { color: theme.colors.primary }]}
+              style={[
+                styles.languageValue,
+                {
+                  color: theme.colors.primary,
+                  fontSize: fontSize,
+                },
+              ]}
             >
               {language === "en" ? "English" : "العربية"}
             </Text>
@@ -118,78 +259,156 @@ const SettingsScreen = () => {
         </List.Section>
 
         <List.Section>
-          <List.Subheader style={{ color: theme.colors.primary }}>
-            About
+          <List.Subheader
+            style={{
+              color: theme.colors.primary,
+              textAlign: isRTL ? "right" : "left",
+              fontSize: fontSize,
+            }}
+          >
+            {t.about}
           </List.Subheader>
 
           {/* About the App */}
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingContent}>
+          <TouchableOpacity
+            style={[
+              styles.settingItem,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+          >
+            <View
+              style={[
+                styles.settingContent,
+                { flexDirection: isRTL ? "row-reverse" : "row" },
+              ]}
+            >
               <Ionicons
                 name="information-circle-outline"
                 size={24}
                 color={theme.colors.primary}
-                style={styles.settingIcon}
+                style={[
+                  styles.settingIcon,
+                  isRTL ? { marginLeft: 16, marginRight: 0 } : {},
+                ]}
               />
-              <Text style={[styles.settingText, { color: "#263238" }]}>
-                About the App
+              <Text
+                style={[
+                  styles.settingText,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
+                {t.aboutApp}
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward-outline"
+              name={isRTL ? "chevron-back-outline" : "chevron-forward-outline"}
               size={20}
-              color={"#78909C"}
+              color={theme.colors.onSurfaceVariant}
             />
           </TouchableOpacity>
 
           <Divider />
 
           {/* Privacy Policy */}
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingContent}>
+          <TouchableOpacity
+            style={[
+              styles.settingItem,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+          >
+            <View
+              style={[
+                styles.settingContent,
+                { flexDirection: isRTL ? "row-reverse" : "row" },
+              ]}
+            >
               <Ionicons
                 name="shield-outline"
                 size={24}
                 color={theme.colors.primary}
-                style={styles.settingIcon}
+                style={[
+                  styles.settingIcon,
+                  isRTL ? { marginLeft: 16, marginRight: 0 } : {},
+                ]}
               />
-              <Text style={[styles.settingText, { color: "#263238" }]}>
-                Privacy Policy
+              <Text
+                style={[
+                  styles.settingText,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
+                {t.privacyPolicy}
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward-outline"
+              name={isRTL ? "chevron-back-outline" : "chevron-forward-outline"}
               size={20}
-              color={"#78909C"}
+              color={theme.colors.onSurfaceVariant}
             />
           </TouchableOpacity>
 
           <Divider />
 
           {/* Rate the App */}
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingContent}>
+          <TouchableOpacity
+            style={[
+              styles.settingItem,
+              { flexDirection: isRTL ? "row-reverse" : "row" },
+            ]}
+            onPress={handleRateApp}
+          >
+            <View
+              style={[
+                styles.settingContent,
+                { flexDirection: isRTL ? "row-reverse" : "row" },
+              ]}
+            >
               <Ionicons
                 name="star-outline"
                 size={24}
                 color={theme.colors.primary}
-                style={styles.settingIcon}
+                style={[
+                  styles.settingIcon,
+                  isRTL ? { marginLeft: 16, marginRight: 0 } : {},
+                ]}
               />
-              <Text style={[styles.settingText, { color: "#263238" }]}>
-                Rate the App
+              <Text
+                style={[
+                  styles.settingText,
+                  {
+                    color: theme.colors.onSurface,
+                    fontSize: fontSize,
+                  },
+                ]}
+              >
+                {t.rateApp}
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward-outline"
+              name={isRTL ? "chevron-back-outline" : "chevron-forward-outline"}
               size={20}
-              color={"#78909C"}
+              color={theme.colors.onSurfaceVariant}
             />
           </TouchableOpacity>
         </List.Section>
 
         <View style={styles.versionContainer}>
-          <Text style={[styles.versionText, { color: "#78909C" }]}>
-            Version 1.0.0
+          <Text
+            style={[
+              styles.versionText,
+              {
+                color: theme.colors.onSurfaceVariant,
+                fontSize: fontSize - 2,
+              },
+            ]}
+          >
+            {t.version}
           </Text>
         </View>
       </ScrollView>

@@ -1,6 +1,6 @@
 // src/components/VerseItem.tsx
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { Text, Surface, IconButton, useTheme } from "react-native-paper";
 import { Verse } from "../api/quranApi";
 import { useAppContext } from "../context/AppContext";
@@ -14,15 +14,32 @@ type VerseItemProps = {
 const VerseItem: React.FC<VerseItemProps> = ({ verse, chapterNumber }) => {
   const theme = useTheme();
   const { fontSize, bookmarks, addBookmark, removeBookmark } = useAppContext();
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const isBookmarked = bookmarks.includes(verse.number);
 
+  /** 🔹 FIXED: Check bookmark by chapter + verse */
+  const isBookmarked = bookmarks.some(
+    (b) => b.chapterNumber === chapterNumber && b.verseNumber === verse.number,
+  );
+
+  /** 🔹 FIXED: Save full bookmark object */
   const toggleBookmark = () => {
     if (isBookmarked) {
-      removeBookmark(verse.number);
+      const existing = bookmarks.find(
+        (b) =>
+          b.chapterNumber === chapterNumber && b.verseNumber === verse.number,
+      );
+      if (existing) {
+        removeBookmark(existing.id);
+      }
     } else {
-      addBookmark(verse.number);
+      addBookmark({
+        id: `${chapterNumber}-${verse.number}`,
+        chapterNumber,
+        verseNumber: verse.number,
+        date: new Date().toISOString(),
+      });
     }
   };
 
@@ -35,15 +52,18 @@ const VerseItem: React.FC<VerseItemProps> = ({ verse, chapterNumber }) => {
       return;
     }
 
+    if (!verse.audio) return;
+
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: verse.audio || "" },
-        { shouldPlay: true }
+        { uri: verse.audio },
+        { shouldPlay: true },
       );
+
       setSound(newSound);
       setIsPlaying(true);
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
+      newSound.setOnPlaybackStatusUpdate((status: any) => {
         if (status.didJustFinish) {
           setIsPlaying(false);
         }
@@ -70,6 +90,7 @@ const VerseItem: React.FC<VerseItemProps> = ({ verse, chapterNumber }) => {
         >
           <Text style={styles.numberText}>{verse.number}</Text>
         </View>
+
         <View style={styles.actions}>
           {verse.audio && (
             <IconButton

@@ -10,62 +10,102 @@ import {
 import { Text, Button, useTheme, Card } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../components/Header";
-import { fetchChapters, Chapter } from "../api/quranApi";
+import { fetchAllJuz, JuzInfo, Chapter } from "../api/quranApi";
 import { useNavigation } from "@react-navigation/native";
+
+const LAST_READ_KEY = "@last_read_item";
+
+type LastReadData = {
+  type: "juz" | "chapter";
+  juz?: JuzInfo;
+  chapter?: Chapter;
+  timestamp: string;
+};
 
 const HomeScreen = () => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const [popularChapters, setPopularChapters] = useState<Chapter[]>([]);
-  const [lastRead, setLastRead] = useState<{
-    chapter: Chapter;
-    verse: number;
-  } | null>(null);
+  const [popularJuz, setPopularJuz] = useState<JuzInfo[]>([]);
+  const [lastRead, setLastRead] = useState<LastReadData | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const chapters = await fetchChapters();
-        // Get some popular chapters (for example, Al-Fatiha, Al-Baqarah, etc.)
-        const popular = [1, 2, 36, 55, 67, 112].map(
-          (num) => chapters.find((c) => c.number === num)!
-        );
-        setPopularChapters(popular.filter(Boolean));
-
-        // Simulate last read data (would be stored in AsyncStorage in a real app)
-        setLastRead({
-          chapter: chapters.find((c) => c.number === 2)!,
-          verse: 255, // Ayat Al-Kursi
-        });
-      } catch (error) {
-        console.error("Error loading home data:", error);
-      }
-    };
-
     loadData();
-  }, []);
 
-  const navigateToChapter = (chapter: Chapter, verse?: number) => {
+    // Listen for navigation changes to reload last read
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadLastRead();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadData = async () => {
+    try {
+      // Load popular Juz (Para 1, 15, 18, 28, 29, 30)
+      const allJuz = fetchAllJuz();
+      const popular = [1, 15, 18, 28, 29, 30].map(
+        (num) => allJuz.find((j) => j.number === num)!,
+      );
+      setPopularJuz(popular.filter(Boolean));
+
+      // Load last read
+      await loadLastRead();
+    } catch (error) {
+      console.error("Error loading home data:", error);
+    }
+  };
+
+  const loadLastRead = async () => {
+    try {
+      const lastReadData = await AsyncStorage.getItem(LAST_READ_KEY);
+      if (lastReadData) {
+        const data: LastReadData = JSON.parse(lastReadData);
+        setLastRead(data);
+      }
+    } catch (error) {
+      console.error("Error loading last read:", error);
+    }
+  };
+
+  const navigateToJuz = (juz: JuzInfo) => {
     navigation.navigate(
-      "Chapters" as never,
+      "Juz" as never,
       {
-        screen: "ChapterDetail",
-        params: { chapter, initialVerse: verse },
-      } as never
+        screen: "JuzDetail",
+        params: { juz },
+      } as never,
     );
   };
 
-  const navigateToAllChapters = () => {
+  const navigateToChapter = (chapter: Chapter) => {
     navigation.navigate(
-      "Chapters" as never,
-      { screen: "ChaptersList" } as never
+      "Surah" as never,
+      {
+        screen: "ChapterDetail",
+        params: { chapter },
+      } as never,
     );
+  };
+
+  const handleContinueReading = () => {
+    if (!lastRead) return;
+
+    if (lastRead.type === "juz" && lastRead.juz) {
+      navigateToJuz(lastRead.juz);
+    } else if (lastRead.type === "chapter" && lastRead.chapter) {
+      navigateToChapter(lastRead.chapter);
+    }
+  };
+
+  const navigateToAllJuz = () => {
+    navigation.navigate("Juz" as never);
   };
 
   const features = [
-    { icon: "book", title: "All Chapters", onPress: navigateToAllChapters },
+    { icon: "book", title: "All Juz", onPress: navigateToAllJuz },
     {
       icon: "bookmark",
       title: "Bookmarks",
@@ -109,13 +149,13 @@ const HomeScreen = () => {
                 styles.startButton,
                 { backgroundColor: theme.colors.primary },
               ]}
-              onPress={navigateToAllChapters}
+              onPress={navigateToAllJuz}
             >
               Start Reading
             </Button>
           </View>
           <Image
-            source={{ uri: "https://i.imgur.com/JFHkfFR.png" }}
+            source={require("../../assets/images/quranAppIcon.png")}
             style={styles.heroImage}
           />
         </View>
@@ -157,7 +197,7 @@ const HomeScreen = () => {
           </View>
         </View>
 
-        {/* Last Read */}
+        {/* Last Read - Universal (Juz or Chapter) */}
         {lastRead && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -170,24 +210,55 @@ const HomeScreen = () => {
                 styles.lastReadCard,
                 { backgroundColor: theme.colors.surface },
               ]}
-              onPress={() =>
-                navigateToChapter(lastRead.chapter, lastRead.verse)
-              }
+              onPress={handleContinueReading}
             >
               <Card.Content style={styles.lastReadContent}>
-                <View>
-                  <Text style={[styles.lastReadChapter, { color: "#263238" }]}>
-                    {lastRead.chapter.englishName}
-                  </Text>
-                  <Text style={[styles.lastReadInfo, { color: "#78909C" }]}>
-                    Verse {lastRead.verse}
-                  </Text>
+                <View style={styles.lastReadInfo}>
+                  {lastRead.type === "juz" && lastRead.juz ? (
+                    <>
+                      <Text
+                        style={[styles.lastReadTitle, { color: "#263238" }]}
+                      >
+                        Juz {lastRead.juz.number} - {lastRead.juz.name}
+                      </Text>
+                      <Text
+                        style={[styles.lastReadArabic, { color: "#78909C" }]}
+                      >
+                        {lastRead.juz.nameArabic}
+                      </Text>
+                      <Text
+                        style={[styles.lastReadDetail, { color: "#78909C" }]}
+                      >
+                        Surah {lastRead.juz.startSurah}:
+                        {lastRead.juz.startVerse} - {lastRead.juz.endSurah}:
+                        {lastRead.juz.endVerse}
+                      </Text>
+                    </>
+                  ) : lastRead.type === "chapter" && lastRead.chapter ? (
+                    <>
+                      <Text
+                        style={[styles.lastReadTitle, { color: "#263238" }]}
+                      >
+                        Surah {lastRead.chapter.number} -{" "}
+                        {lastRead.chapter.englishName}
+                      </Text>
+                      <Text
+                        style={[styles.lastReadArabic, { color: "#78909C" }]}
+                      >
+                        {lastRead.chapter.name}
+                      </Text>
+                      <Text
+                        style={[styles.lastReadDetail, { color: "#78909C" }]}
+                      >
+                        {lastRead.chapter.englishNameTranslation} •{" "}
+                        {lastRead.chapter.numberOfAyahs} verses
+                      </Text>
+                    </>
+                  ) : null}
                 </View>
                 <Button
                   mode="outlined"
-                  onPress={() =>
-                    navigateToChapter(lastRead.chapter, lastRead.verse)
-                  }
+                  onPress={handleContinueReading}
                   style={{ borderColor: theme.colors.primary }}
                   labelStyle={{ color: theme.colors.primary }}
                 >
@@ -198,13 +269,13 @@ const HomeScreen = () => {
           </View>
         )}
 
-        {/* Popular Chapters */}
+        {/* Popular Juz */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: "#263238" }]}>
-              Popular Chapters
+              Popular Juz (Para)
             </Text>
-            <TouchableOpacity onPress={navigateToAllChapters}>
+            <TouchableOpacity onPress={navigateToAllJuz}>
               <Text
                 style={[styles.viewAllText, { color: theme.colors.primary }]}
               >
@@ -213,39 +284,39 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.popularChaptersContainer}>
-            {popularChapters.map((chapter) => (
+          <View style={styles.popularJuzContainer}>
+            {popularJuz.map((juz) => (
               <TouchableOpacity
-                key={chapter.number}
+                key={juz.number}
                 style={[
-                  styles.popularChapterItem,
+                  styles.popularJuzItem,
                   { backgroundColor: theme.colors.surface },
                 ]}
-                onPress={() => navigateToChapter(chapter)}
+                onPress={() => navigateToJuz(juz)}
               >
                 <View
                   style={[
-                    styles.chapterNumberContainer,
+                    styles.juzNumberContainer,
                     { backgroundColor: `${theme.colors.primary}20` },
                   ]}
                 >
                   <Text
-                    style={[
-                      styles.chapterNumber,
-                      { color: theme.colors.primary },
-                    ]}
+                    style={[styles.juzNumber, { color: theme.colors.primary }]}
                   >
-                    {chapter.number}
+                    {juz.number}
                   </Text>
                 </View>
                 <Text
-                  style={[styles.chapterName, { color: "#263238" }]}
+                  style={[styles.juzName, { color: "#263238" }]}
                   numberOfLines={1}
                 >
-                  {chapter.englishName}
+                  {juz.name}
                 </Text>
-                <Text style={[styles.chapterInfo, { color: "#78909C" }]}>
-                  {chapter.numberOfAyahs} verses
+                <Text style={[styles.juzNameArabic, { color: "#78909C" }]}>
+                  {juz.nameArabic}
+                </Text>
+                <Text style={[styles.juzInfo, { color: "#78909C" }]}>
+                  Surah {juz.startSurah}-{juz.endSurah}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -293,8 +364,8 @@ const styles = StyleSheet.create({
     width: 160,
   },
   heroImage: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     resizeMode: "contain",
   },
   section: {
@@ -347,26 +418,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  lastReadChapter: {
+  lastReadInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  lastReadTitle: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 4,
   },
-  lastReadInfo: {
+  lastReadArabic: {
     fontSize: 14,
+    textAlign: "right",
+    marginBottom: 4,
   },
-  popularChaptersContainer: {
+  lastReadDetail: {
+    fontSize: 12,
+  },
+  popularJuzContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 8,
+    paddingBottom: 20,
   },
-  popularChapterItem: {
+  popularJuzItem: {
     width: "46%",
     margin: "2%",
     padding: 16,
     borderRadius: 12,
   },
-  chapterNumberContainer: {
+  juzNumberContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -374,16 +455,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  chapterNumber: {
+  juzNumber: {
     fontSize: 16,
     fontWeight: "bold",
   },
-  chapterName: {
+  juzName: {
     fontSize: 16,
     fontWeight: "500",
     marginBottom: 4,
   },
-  chapterInfo: {
+  juzNameArabic: {
+    fontSize: 14,
+    textAlign: "right",
+    marginBottom: 4,
+  },
+  juzInfo: {
     fontSize: 12,
   },
 });

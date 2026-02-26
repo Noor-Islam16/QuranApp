@@ -1,106 +1,160 @@
 // src/screens/BookmarkScreen.tsx
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, FlatList, TouchableOpacity } from "react-native";
-import {
-  Text,
-  Surface,
-  Divider,
-  useTheme,
-  IconButton,
-} from "react-native-paper";
+import { View, StyleSheet, FlatList } from "react-native";
+import { Text, Surface, IconButton, useTheme } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
+import { Audio } from "expo-av";
 import Header from "../components/Header";
 import { useAppContext } from "../context/AppContext";
-import { fetchChapters, Chapter } from "../api/quranApi";
-import { Ionicons } from "@expo/vector-icons";
+import { fetchChapter, Chapter, Verse } from "../api/quranApi";
 
-type BookmarkItem = {
-  id: number;
+type BookmarkWithVerse = {
+  id: string;
   chapterNumber: number;
   verseNumber: number;
-  chapterName: string;
-  date: Date;
+  date: string;
+  verse?: Verse;
+  chapter?: Chapter;
 };
 
 const BookmarkScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation();
-  const { bookmarks, removeBookmark } = useAppContext();
-  const [bookmarkItems, setBookmarkItems] = useState<BookmarkItem[]>([]);
-  const [chapters, setChapters] = useState<Record<number, Chapter>>({});
+  const { bookmarks, removeBookmark, fontSize } = useAppContext();
+  const [bookmarksWithData, setBookmarksWithData] = useState<
+    BookmarkWithVerse[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [sounds, setSounds] = useState<Record<string, Audio.Sound>>({});
 
   useEffect(() => {
-    loadChapters();
-  }, []);
+    loadBookmarkData();
 
-  useEffect(() => {
-    // This is a mock implementation - in a real app this would use AsyncStorage
-    const mockBookmarks: BookmarkItem[] = [
-      {
-        id: 1,
-        chapterNumber: 2,
-        verseNumber: 255,
-        chapterName: "Al-Baqarah",
-        date: new Date(2024, 3, 1),
-      },
-      {
-        id: 2,
-        chapterNumber: 36,
-        verseNumber: 1,
-        chapterName: "Ya-Sin",
-        date: new Date(2024, 3, 5),
-      },
-      {
-        id: 3,
-        chapterNumber: 112,
-        verseNumber: 1,
-        chapterName: "Al-Ikhlas",
-        date: new Date(2024, 3, 8),
-      },
-    ];
-
-    setBookmarkItems(mockBookmarks);
+    // Cleanup sounds on unmount
+    return () => {
+      Object.values(sounds).forEach(async (sound) => {
+        try {
+          await sound.unloadAsync();
+        } catch (e) {
+          console.error("Error unloading sound:", e);
+        }
+      });
+    };
   }, [bookmarks]);
 
-  const loadChapters = async () => {
+  const loadBookmarkData = async () => {
+    setLoading(true);
+    const bookmarksData: BookmarkWithVerse[] = [];
+
+    for (const bookmark of bookmarks) {
+      try {
+        const { chapter, verses } = await fetchChapter(bookmark.chapterNumber);
+        const verse = verses.find((v) => v.number === bookmark.verseNumber);
+
+        bookmarksData.push({
+          ...bookmark,
+          verse,
+          chapter,
+        });
+      } catch (e) {
+        console.error(`Error loading bookmark data:`, e);
+        bookmarksData.push(bookmark);
+      }
+    }
+
+    setBookmarksWithData(bookmarksData);
+    setLoading(false);
+  };
+
+  const playAudio = async (bookmarkId: string, audioUrl?: string) => {
+    if (!audioUrl) return;
+
+    // Stop currently playing audio
+    if (playingId && sounds[playingId]) {
+      try {
+        await sounds[playingId].stopAsync();
+        await sounds[playingId].unloadAsync();
+        setSounds((prev) => {
+          const updated = { ...prev };
+          delete updated[playingId];
+          return updated;
+        });
+      } catch (e) {
+        console.error("Error stopping audio:", e);
+      }
+    }
+
+    // If clicking the same bookmark, just stop
+    if (playingId === bookmarkId) {
+      setPlayingId(null);
+      return;
+    }
+
+    // Play new audio
     try {
-      const chaptersData = await fetchChapters();
-      const chaptersMap: Record<number, Chapter> = {};
-      chaptersData.forEach((chapter) => {
-        chaptersMap[chapter.number] = chapter;
-      });
-      setChapters(chaptersMap);
-    } catch (error) {
-      console.error("Error loading chapters for bookmarks:", error);
-    }
-  };
-
-  const navigateToVerse = (chapterNumber: number, verseNumber: number) => {
-    const chapter = chapters[chapterNumber];
-    if (chapter) {
-      navigation.navigate(
-        "Chapters" as never,
-        {
-          screen: "ChapterDetail",
-          params: { chapter, initialVerse: verseNumber },
-        } as never
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true },
       );
+
+      setSounds((prev) => ({ ...prev, [bookmarkId]: newSound }));
+      setPlayingId(bookmarkId);
+
+      newSound.setOnPlaybackStatusUpdate((status: any) => {
+        if (status.didJustFinish) {
+          setPlayingId(null);
+          setSounds((prev) => {
+            const updated = { ...prev };
+            delete updated[bookmarkId];
+            return updated;
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Error playing audio:", error);
+      setPlayingId(null);
     }
   };
 
-  const handleRemoveBookmark = (id: number) => {
-    // In a real app, this would update AsyncStorage as well
-    setBookmarkItems(bookmarkItems.filter((item) => item.id !== id));
-    removeBookmark(id);
+  const navigateToVerse = (
+    chapterNumber: number,
+    verseNumber: number,
+    chapter?: Chapter,
+  ) => {
+    if (!chapter) return;
+
+    navigation.navigate(
+      "Chapters" as never,
+      {
+        screen: "ChapterDetail",
+        params: { chapter, initialVerse: verseNumber },
+      } as never,
+    );
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  if (bookmarks.length === 0) {
+    return (
+      <View
+        style={[
+          styles.emptyContainer,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <Text style={[styles.emptyText, { color: theme.colors.onSurface }]}>
+          No bookmarks yet
+        </Text>
+        <Text
+          style={[
+            styles.emptySubtext,
+            { color: theme.colors.onSurfaceVariant },
+          ]}
+        >
+          Bookmark verses to access them quickly later
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -108,57 +162,109 @@ const BookmarkScreen = () => {
     >
       <Header title="Bookmarks" />
 
-      {bookmarkItems.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="bookmark-outline" size={64} color={"#78909C"} />
-          <Text style={[styles.emptyText, { color: "#263238" }]}>
-            No bookmarks yet
-          </Text>
-          <Text style={[styles.emptySubtext, { color: "#78909C" }]}>
-            Bookmark verses to access them quickly later
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={bookmarkItems}
-          keyExtractor={(item) => item.id.toString()}
-          ItemSeparatorComponent={() => <Divider />}
-          renderItem={({ item }) => (
+      <FlatList
+        data={bookmarksWithData}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingVertical: 8 }}
+        renderItem={({ item }) => {
+          const isPlaying = playingId === item.id;
+
+          return (
             <Surface
               style={[
-                styles.bookmarkItem,
-                { backgroundColor: theme.colors.surface },
+                styles.containerCard,
+                { backgroundColor: theme.colors.surface, elevation: 1 },
               ]}
             >
-              <TouchableOpacity
-                style={styles.bookmarkContent}
-                onPress={() =>
-                  navigateToVerse(item.chapterNumber, item.verseNumber)
-                }
-              >
-                <View style={styles.bookmarkInfo}>
-                  <Text style={[styles.chapterName, { color: "#263238" }]}>
-                    {item.chapterName}
-                  </Text>
-                  <Text style={[styles.verseInfo, { color: "#78909C" }]}>
-                    Chapter {item.chapterNumber}, Verse {item.verseNumber}
-                  </Text>
-                  <Text style={[styles.dateText, { color: "#78909C" }]}>
-                    {formatDate(item.date)}
-                  </Text>
+              {/* Header */}
+              <View style={styles.header}>
+                <View
+                  style={[
+                    styles.numberBadge,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                >
+                  <Text style={styles.numberText}>{item.verseNumber}</Text>
                 </View>
-                <IconButton
-                  icon="trash-outline"
-                  iconColor={theme.colors.error}
-                  size={20}
-                  onPress={() => handleRemoveBookmark(item.id)}
-                />
-              </TouchableOpacity>
+
+                <View style={styles.actions}>
+                  {item.verse?.audio && (
+                    <IconButton
+                      icon={isPlaying ? "pause" : "play"}
+                      size={20}
+                      onPress={() => playAudio(item.id, item.verse?.audio)}
+                      iconColor={theme.colors.primary}
+                    />
+                  )}
+                  <IconButton
+                    icon="delete"
+                    size={20}
+                    iconColor={theme.colors.error}
+                    onPress={() => removeBookmark(item.id)}
+                  />
+                </View>
+              </View>
+
+              {/* Content */}
+              <View style={styles.content}>
+                {/* Chapter Info */}
+                <Text
+                  style={[
+                    styles.chapterName,
+                    { color: theme.colors.primary, fontSize: fontSize - 2 },
+                  ]}
+                  onPress={() =>
+                    navigateToVerse(
+                      item.chapterNumber,
+                      item.verseNumber,
+                      item.chapter,
+                    )
+                  }
+                >
+                  {item.chapter?.name || "Chapter"} - Verse {item.verseNumber}
+                </Text>
+
+                {/* Arabic Text */}
+                {item.verse?.text && (
+                  <Text
+                    style={[
+                      styles.arabicText,
+                      { fontSize: fontSize + 4, color: "#263238" },
+                    ]}
+                  >
+                    {item.verse.text}
+                  </Text>
+                )}
+
+                {/* English Translation */}
+                {item.verse?.translation && (
+                  <Text
+                    style={[
+                      styles.translationText,
+                      { fontSize: fontSize - 2, color: "#78909C" },
+                    ]}
+                  >
+                    {item.verse.translation}
+                  </Text>
+                )}
+
+                {/* Date */}
+                <Text
+                  style={[
+                    styles.dateText,
+                    {
+                      color: theme.colors.onSurfaceVariant,
+                      fontSize: fontSize - 4,
+                    },
+                  ]}
+                >
+                  Saved on {new Date(item.date).toLocaleDateString()}
+                </Text>
+              </View>
             </Surface>
-          )}
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+          );
+        }}
+      />
     </View>
   );
 };
@@ -166,7 +272,10 @@ const BookmarkScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: 60,
   },
+
+  /* Empty state */
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -176,41 +285,71 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "bold",
-    marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: "center",
   },
-  listContent: {
-    paddingVertical: 8,
-  },
-  bookmarkItem: {
-    marginHorizontal: 16,
+
+  /* Card — SAME AS VerseItem */
+  containerCard: {
     marginVertical: 8,
+    marginHorizontal: 16,
     borderRadius: 12,
     overflow: "hidden",
   },
-  bookmarkContent: {
+
+  header: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+
+  numberBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  numberText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+
+  actions: {
+    flexDirection: "row",
+  },
+
+  content: {
     padding: 16,
   },
-  bookmarkInfo: {
-    flex: 1,
-  },
+
   chapterName: {
-    fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  verseInfo: {
-    fontSize: 14,
-    marginBottom: 4,
+
+  arabicText: {
+    textAlign: "right",
+    lineHeight: 36,
+    marginBottom: 12,
+    fontFamily: "System",
   },
+
+  translationText: {
+    textAlign: "left",
+    lineHeight: 24,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+
   dateText: {
-    fontSize: 12,
+    marginTop: 8,
   },
 });
 

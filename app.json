@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "QuranApp",
-    "slug": "QuranApp",
-    "version": "1.0.0",
+    "name": "Al-Quran",
+    "slug": "Al-Quran",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/quranAppIcon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,8 +13,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/quranAppIcon.png",
+        "backgroundColor": "#029688"
       },
       "package": "com.asrtech123.QuranApp"
     },
@@ -28,15 +28,23 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/quranAppIcon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#029688"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "a31e7730-fb66-4998-90e4-2f78955567c8"
+      }
     }
   }
 }
